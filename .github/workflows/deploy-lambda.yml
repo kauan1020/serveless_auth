@@ -17,11 +17,14 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v3
 
-      - name: Configurar Credenciais AWS via Role
+      - name: Configurar Credenciais AWS
         uses: aws-actions/configure-aws-credentials@v2
         with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           role-to-assume: arn:aws:iam::349246405584:role/LabRole
           aws-region: us-east-1
+
 
       - name: Instalar Java e Maven
         run: |
