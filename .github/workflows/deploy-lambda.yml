@@ -3,15 +3,11 @@ name: Deploy AWS Lambda
 on:
   push:
     branches:
-      - main  # Dispara o workflow ao fazer push na branch main
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - name: Checkout do código
@@ -23,9 +19,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          role-to-assume: arn:aws:iam::349246405584:role/LabRole
           aws-region: us-east-1
-
 
       - name: Instalar Java e Maven
         run: |
@@ -40,10 +34,12 @@ jobs:
         run: zip -r auth-lambda.zip auth-lambda.jar
 
       - name: Fazer Upload para S3
-        run: aws s3 cp auth-lambda.zip s3://function-lambda-tech-challenge-kauan/lambda_deploy.zip
+        run: |
+          aws s3api put-object --bucket function-lambda-tech-challenge-kauan --key lambda_deploy.zip --body auth-lambda.zip
 
       - name: Atualizar AWS Lambda
         run: |
           aws lambda update-function-code \
             --function-name Tech_challenge \
-            --zip-file fileb://lambda_deploy.zip
+            --s3-bucket function-lambda-tech-challenge-kauan \
+            --s3-key lambda_deploy.zip
