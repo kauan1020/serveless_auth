@@ -9,16 +9,18 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
       - name: Checkout do código
         uses: actions/checkout@v3
 
-      - name: Configurar Credenciais AWS
+      - name: Configurar Credenciais AWS via Role
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          role-to-assume: arn:aws:iam::349246405584:role/LabRole
           aws-region: us-east-1
 
       - name: Instalar Java e Maven
@@ -33,7 +35,7 @@ jobs:
       - name: Criar ZIP para Lambda
         run: zip -r auth-lambda.zip auth-lambda.jar
 
-      - name: Fazer Upload para S3 (Opcional)
+      - name: Fazer Upload para S3
         run: aws s3 cp auth-lambda.zip s3://meu-bucket-deploy/auth-lambda.zip
 
       - name: Atualizar AWS Lambda
