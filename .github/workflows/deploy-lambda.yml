@@ -33,13 +33,8 @@ jobs:
       - name: Criar ZIP para Lambda
         run: zip -r auth-lambda.zip auth-lambda.jar
 
-      - name: Fazer Upload para S3
-        run: |
-          aws s3api put-object --bucket function-lambda-tech-challenge-kauan --key lambda_deploy.zip --body auth-lambda.zip
-
-      - name: Atualizar AWS Lambda
+      - name: Atualizar AWS Lambda (método direto)
         run: |
           aws lambda update-function-code \
             --function-name Tech_challenge \
-            --s3-bucket function-lambda-tech-challenge-kauan \
-            --s3-key lambda_deploy.zip
+            --zip-file fileb://auth-lambda.zip
