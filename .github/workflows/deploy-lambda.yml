@@ -23,7 +23,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          role-to-assume: arn:aws:iam::349246405584:role/LabRole
           aws-region: us-east-1
 
 
@@ -40,10 +39,10 @@ jobs:
         run: zip -r auth-lambda.zip auth-lambda.jar
 
       - name: Fazer Upload para S3
-        run: aws s3 cp auth-lambda.zip s3://meu-bucket-deploy/auth-lambda.zip
+        run: aws s3 cp auth-lambda.zip s3://function-lambda-tech-challenge-kauan/lambda_deploy.zip
 
       - name: Atualizar AWS Lambda
         run: |
           aws lambda update-function-code \
-            --function-name minha-lambda \
-            --zip-file fileb://auth-lambda.zip
+            --function-name Tech_challenge \
+            --zip-file fileb://lambda_deploy.zip
