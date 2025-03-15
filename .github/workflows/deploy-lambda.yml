@@ -3,7 +3,10 @@ name: Deploy AWS Lambda
 on:
   push:
     branches:
-      - main  # Dispara o workflow ao fazer push na branch main
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   deploy:
@@ -13,16 +16,19 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v3
 
-      - name: Configurar Credenciais AWS
+      - name: Configurar Credenciais AWS usando Role
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::349246405584:role/LabRole
           aws-region: us-east-1
 
-      - name: Instalar Java e Maven
+      - name: Configurar Variáveis de Ambiente
         run: |
-          sudo apt update && sudo apt install -y maven
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> $GITHUB_ENV
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $GITHUB_ENV
+          echo "DB_USER=${{ secrets.DB_USER }}" >> $GITHUB_ENV
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
 
       - name: Compilar e Empacotar JAR
         run: |
@@ -31,9 +37,6 @@ jobs:
 
       - name: Criar ZIP para Lambda
         run: zip -r auth-lambda.zip auth-lambda.jar
-
-      - name: Fazer Upload para S3 (Opcional)
-        run: aws s3 cp auth-lambda.zip s3://meu-bucket-deploy/auth-lambda.zip
 
       - name: Atualizar AWS Lambda
         run: |
