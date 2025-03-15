@@ -36,6 +36,8 @@ public class AuthHandler implements RequestHandler<Map<String, Object>, Map<Stri
         headers.put("Content-Type", "application/json");
 
         try {
+            context.getLogger().log("Recebendo evento: " + mapper.writeValueAsString(event));
+
             Map<String, Object> body;
             Object rawBody = event.get("body");
 
@@ -51,7 +53,9 @@ public class AuthHandler implements RequestHandler<Map<String, Object>, Map<Stri
             if (cpf == null || cpf.trim().isEmpty()) {
                 response.put("statusCode", 400);
                 response.put("headers", headers);
-                response.put("body", createJsonResponse("CPF é obrigatório"));
+                ObjectNode errorBody = mapper.createObjectNode();
+                errorBody.put("message", "CPF é obrigatório");
+                response.put("body", errorBody.toString());
                 return response;
             }
 
@@ -59,7 +63,9 @@ public class AuthHandler implements RequestHandler<Map<String, Object>, Map<Stri
             if (userData == null) {
                 response.put("statusCode", 404);
                 response.put("headers", headers);
-                response.put("body", createJsonResponse("Usuário não encontrado"));
+                ObjectNode errorBody = mapper.createObjectNode();
+                errorBody.put("message", "Usuário não encontrado");
+                response.put("body", errorBody.toString());
                 return response;
             }
 
@@ -67,21 +73,32 @@ public class AuthHandler implements RequestHandler<Map<String, Object>, Map<Stri
 
             response.put("statusCode", 200);
             response.put("headers", headers);
-            response.put("body", createJsonResponseWithToken(jwtToken));
+            ObjectNode successBody = mapper.createObjectNode();
+            successBody.put("token", jwtToken);
+            successBody.put("expires_in", 7200);
+            response.put("body", successBody.toString());
 
         } catch (Exception e) {
+            context.getLogger().log("Erro: " + e.getMessage());
             response.put("statusCode", 500);
             response.put("headers", headers);
-            response.put("body", createJsonResponse("Erro interno do servidor"));
+            ObjectNode errorBody = mapper.createObjectNode();
+            errorBody.put("message", "Erro interno do servidor");
+            response.put("body", errorBody.toString());
         }
 
         return response;
     }
 
-    private Connection getConnection() throws Exception {
-        if (conn == null || conn.isClosed()) {
-            Class.forName("org.postgresql.Driver");
-            conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+    private Connection getConnection() {
+        try {
+            if (conn == null || conn.isClosed()) {
+                Class.forName("org.postgresql.Driver");
+                conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao conectar ao banco: " + e.getMessage());
+            return null;
         }
         return conn;
     }
@@ -89,11 +106,13 @@ public class AuthHandler implements RequestHandler<Map<String, Object>, Map<Stri
     private Map<String, Object> getUserByCPF(String cpf) {
         try {
             Connection connection = getConnection();
-            String sql = "SELECT id, username, email FROM users WHERE cpf = ?";
+            if (connection == null) {
+                return null;
+            }
 
+            String sql = "SELECT id, username, email FROM users WHERE cpf = ?";
             try (PreparedStatement stmt = connection.prepareStatement(sql)) {
                 stmt.setString(1, cpf);
-
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         Map<String, Object> userData = new HashMap<>();
@@ -104,20 +123,22 @@ public class AuthHandler implements RequestHandler<Map<String, Object>, Map<Stri
                     }
                 }
             }
-            return null;
         } catch (Exception e) {
-            if (conn != null) {
-                conn.close();
-                conn = null;
-            }
+            System.err.println("Erro ao consultar banco: " + e.getMessage());
+            try {
+                if (conn != null) {
+                    conn.close();
+                    conn = null;
+                }
+            } catch (Exception ignored) {}
             return null;
         }
+        return null;
     }
 
     private String generateJWT(Map<String, Object> userData) {
         Date now = new Date();
         Date expirationTime = new Date(now.getTime() + 7200 * 1000);
-
         return Jwts.builder()
                 .setSubject(userData.get("id").toString())
                 .claim("username", userData.get("username"))
@@ -125,13 +146,5 @@ public class AuthHandler implements RequestHandler<Map<String, Object>, Map<Stri
                 .setExpiration(expirationTime)
                 .signWith(ALGORITHM, SECRET_KEY.getBytes())
                 .compact();
-    }
-
-    private String createJsonResponse(String message) {
-        return "{\"message\":\"" + message + "\"}";
-    }
-
-    private String createJsonResponseWithToken(String token) {
-        return "{\"token\":\"" + token + "\", \"expires_in\": 7200}";
     }
 }
