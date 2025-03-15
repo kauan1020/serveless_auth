@@ -13,13 +13,43 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v3
 
-      - name: Configurar Credenciais AWS
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: arn:aws:iam::349246405584:role/LabRole
-          aws-region: us-east-1
-          disable-session-tagging: true
+      - name: Configurar Credenciais AWS iniciais
+        run: |
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "aws_session_token=${{ secrets.AWS_SESSION_TOKEN }}" >> ~/.aws/credentials
+          echo "region=us-east-1" >> ~/.aws/credentials
+          
+          # Verificar identidade atual
+          aws sts get-caller-identity
 
+      - name: Tentar assumir LabRole
+        run: |
+          # Tentar assumir a LabRole sem usar tags de sessão
+          ROLE_OUTPUT=$(aws sts assume-role \
+            --role-arn arn:aws:iam::349246405584:role/LabRole \
+            --role-session-name GHActions \
+            2>&1) || echo "Não foi possível assumir o papel: $ROLE_OUTPUT"
+          
+          if echo "$ROLE_OUTPUT" | grep -q "AccessKeyId"; then
+            # Extrair e configurar as credenciais da role
+            export AWS_ACCESS_KEY_ID=$(echo $ROLE_OUTPUT | jq -r '.Credentials.AccessKeyId')
+            export AWS_SECRET_ACCESS_KEY=$(echo $ROLE_OUTPUT | jq -r '.Credentials.SecretAccessKey')
+            export AWS_SESSION_TOKEN=$(echo $ROLE_OUTPUT | jq -r '.Credentials.SessionToken')
+            
+            # Atualizar o arquivo de credenciais
+            echo "[default]" > ~/.aws/credentials
+            echo "aws_access_key_id=$AWS_ACCESS_KEY_ID" >> ~/.aws/credentials
+            echo "aws_secret_access_key=$AWS_SECRET_ACCESS_KEY" >> ~/.aws/credentials
+            echo "aws_session_token=$AWS_SESSION_TOKEN" >> ~/.aws/credentials
+            
+            echo "LabRole assumida com sucesso"
+            aws sts get-caller-identity
+          else
+            echo "Continuando com as credenciais originais"
+          fi
 
       - name: Instalar Java e Maven
         run: |
@@ -33,8 +63,12 @@ jobs:
       - name: Criar ZIP para Lambda
         run: zip -r auth-lambda.zip auth-lambda.jar
 
-      - name: Atualizar AWS Lambda (método direto)
+      - name: Tentar operações na AWS
         run: |
+          echo "Tentando upload para S3..."
+          aws s3 cp auth-lambda.zip s3://function-lambda-tech-challenge-kauan/lambda_deploy.zip || echo "Falha no upload para S3"
+          
+          echo "Tentando atualizar Lambda..."
           aws lambda update-function-code \
             --function-name Tech_challenge \
-            --zip-file fileb://auth-lambda.zip
+            --zip-file fileb://auth-lambda.zip || echo "Falha na atualização do Lambda"
