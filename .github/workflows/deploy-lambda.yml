@@ -1,0 +1,42 @@
+name: Deploy AWS Lambda
+
+on:
+  push:
+    branches:
+      - main  # Dispara o workflow ao fazer push na branch main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Configurar Credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Instalar Java e Maven
+        run: |
+          sudo apt update && sudo apt install -y maven
+
+      - name: Compilar e Empacotar JAR
+        run: |
+          mvn clean install -DskipTests
+          cp target/auth-lambda-1.0-SNAPSHOT.jar auth-lambda.jar
+
+      - name: Criar ZIP para Lambda
+        run: zip -r auth-lambda.zip auth-lambda.jar
+
+      - name: Fazer Upload para S3 (Opcional)
+        run: aws s3 cp auth-lambda.zip s3://meu-bucket-deploy/auth-lambda.zip
+
+      - name: Atualizar AWS Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name minha-lambda \
+            --zip-file fileb://auth-lambda.zip
