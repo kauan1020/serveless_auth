@@ -33,7 +33,7 @@ jobs:
       - name: Criar ZIP para Lambda
         run: zip -r auth-lambda.zip auth-lambda.jar
 
-      - name: Atualizar AWS Lambda (método direto)
+      - name: Atualizar AWS Lambda
         run: |
           aws lambda update-function-code \
             --function-name Tech_challenge \
